@@ -188,6 +188,11 @@ async function run() {
       return;
     }
 
+    await exec.exec(`tar --version`);
+    let inputPath = 'C:\\Program Files\\Git\\usr\\bin';
+    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
+    await exec.exec(`tar --version`);
+
     const input = parseInput();
 
     const dest = path.join(tmp_dir, 'msys');
@@ -201,7 +206,7 @@ async function run() {
 
       instCache = new InstallCache(msysRootDir, input);
       core.startGroup('Restoring environment...');
-      cachedInstall = await instCache.restore();
+      cachedInstall = false;//await instCache.restore();
       core.endGroup();
 
       if (!cachedInstall) {
