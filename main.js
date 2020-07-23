@@ -55,6 +55,20 @@ async function disableKeyRefresh(msysRootDir) {
   await exec.exec(`powershell.exe`, [`((Get-Content -path ${postFile} -Raw) -replace '--refresh-keys', '--version') | Set-Content -Path ${postFile}`]);
 }
 
+async function saveCacheMaybe(paths, key) {
+    try {
+      return await cache.saveCache(paths, key);
+    } catch (error) {
+      // In case we try to save a cache for a key that already exists we'll get an error.
+      // This usually happens because something created the same cache while we were running.
+      // Since the cache is already there now this is fine with us.
+      console.log(error.message);
+    }
+}
+
+async function hashPath(path) {
+  return (await hashElement(path, {encoding: 'hex'}))['hash'].toString();
+}
 
 class PackageCache {
 
@@ -78,21 +92,18 @@ class PackageCache {
     // We ideally want a cache matching our configuration, but every cache is OK since we prune it later anyway
     this.restoreKey = await cache.restoreCache([this.pkgCachePath], this.jobCacheKey, [this.jobCacheKey, this.fallbackCacheKey]);
     console.log(`Cache restore for ${this.jobCacheKey}, got ${this.restoreKey}`);
+    return (this.restoreKey !== undefined)
   }
 
   async save() {
-    const saveKey = this.jobCacheKey + '-files:' + (await hashElement(this.pkgCachePath))['hash'].toString();
+    const saveKey = this.jobCacheKey + '-files:' + await hashPath(this.pkgCachePath);
     if (this.restoreKey === saveKey) {
       console.log(`Cache unchanged, skipping save for ${saveKey}`);
-    } else {
-      try {
-        const cacheId  = await cache.saveCache([this.pkgCachePath], saveKey);
-        console.log(`Cache saved as ID ${cacheId} using key ${saveKey}`);
-      } catch (error) {
-        // In case something created the same cache since we restored we'll get an error here,
-        // but that's OK with us, so ignore.
-        console.log(error.message);
-      }
+      return;
+    }
+    const cacheId = await saveCacheMaybe([this.pkgCachePath], saveKey);
+    if (cacheId !== undefined) {
+      console.log(`Cache saved as ID ${cacheId} using key ${saveKey}`);
     }
   }
 
@@ -101,6 +112,42 @@ class PackageCache {
     await runMsys(['paccache', '-r', '-f', '-u', '-k0']);
     // Keep the newest for all other packages
     await runMsys(['paccache', '-r', '-f', '-k1']);
+  }
+
+  async clear() {
+    // Remove all cached packages
+    await pacman(['-Scc']);
+  }
+}
+
+class InstallCache {
+
+  constructor(msysRootDir, input) {
+    let shasum = crypto.createHash('sha1');
+    shasum.update(JSON.stringify(input) + checksum);
+    this.jobCacheKey = 'msys2-inst-conf:' + shasum.digest('hex');
+    this.msysRootDir = msysRootDir
+  }
+
+  async restore() {
+    // We only want a cache which matches our configuration
+    this.restoreKey = await cache.restoreCache([this.msysRootDir], this.jobCacheKey, [this.jobCacheKey]);
+    console.log(`Cache restore for ${this.jobCacheKey}, got ${this.restoreKey}`);
+    return (this.restoreKey !== undefined)
+  }
+
+  async save() {
+    // In cases any of the installed packages have changed we get something new here
+    const pacmanStateDir = path.join(this.msysRootDir, 'var', 'lib', 'pacman', 'local');
+    const saveKey = this.jobCacheKey + '-state:' + await hashPath(pacmanStateDir);
+    if (this.restoreKey === saveKey) {
+      console.log(`Cache unchanged, skipping save for ${saveKey}`);
+      return;
+    }
+    const cacheId = await saveCacheMaybe([this.msysRootDir], saveKey);
+    if (cacheId !== undefined) {
+      console.log(`Cache saved as ID ${cacheId} using key ${saveKey}`);
+    }
   }
 }
 
@@ -140,26 +187,36 @@ async function run() {
       core.setFailed('environment variable RUNNER_TEMP is undefined');
       return;
     }
-    const dest = path.join(tmp_dir, 'msys');
-
-    await io.mkdirP(dest);
 
     const input = parseInput();
 
+    const dest = path.join(tmp_dir, 'msys');
+    await io.mkdirP(dest);
+
+    let cachedInstall = false;
+    let instCache = null;
     let msysRootDir = path.join('C:', 'msys64');
     if (input.release) {
-      // Use upstream package instead of the default installation in the virtual environment.
-      core.startGroup('Downloading MSYS2...');
-      let inst_dest = path.join(tmp_dir, 'base.exe');
-      await downloadInstaller(inst_dest);
-
-      changeGroup('Extracting MSYS2...');
-      await exec.exec(inst_dest, ['-y'], {cwd: dest});
       msysRootDir = path.join(dest, 'msys64');
 
-      changeGroup('Disable Key Refresh...');
-      await disableKeyRefresh(msysRootDir);
+      instCache = new InstallCache(msysRootDir, input);
+      core.startGroup('Restoring environment...');
+      cachedInstall = await instCache.restore();
       core.endGroup();
+
+      if (!cachedInstall) {
+        // Use upstream package instead of the default installation in the virtual environment.
+        core.startGroup('Downloading MSYS2...');
+        let inst_dest = path.join(tmp_dir, 'base.exe');
+        await downloadInstaller(inst_dest);
+
+        changeGroup('Extracting MSYS2...');
+        await exec.exec(inst_dest, ['-y'], {cwd: dest});
+
+        changeGroup('Disable Key Refresh...');
+        await disableKeyRefresh(msysRootDir);
+        core.endGroup();
+      }
     }
 
     writeWrapper(msysRootDir, input.pathtype, dest, 'msys2.cmd');
@@ -169,13 +226,15 @@ async function run() {
 
     const packageCache = new PackageCache(msysRootDir, input);
 
-    core.startGroup('Restoring cache...');
-    await packageCache.restore();
-    core.endGroup();
+    if (!cachedInstall) {
+      core.startGroup('Restoring package cache...');
+      await packageCache.restore();
+      core.endGroup();
 
-    core.startGroup('Starting MSYS2 for the first time...');
-    await runMsys(['uname', '-a']);
-    core.endGroup();
+      core.startGroup('Starting MSYS2 for the first time...');
+      await runMsys(['uname', '-a']);
+      core.endGroup();
+    }
 
     if (input.update) {
       core.startGroup('Disable CheckSpace...');
@@ -196,13 +255,21 @@ async function run() {
       core.endGroup();
     }
 
-    core.startGroup('Prune cache...');
-    await packageCache.prune();
-    core.endGroup();
+    if (!cachedInstall) {
+      core.startGroup('Saving package cache...');
+      await packageCache.prune();
+      await packageCache.save();
+      await packageCache.clear();
+      core.endGroup();
+    }
 
-    core.startGroup('Saving cache...');
-    await packageCache.save();
-    core.endGroup();
+    if (input.release) {
+      assert.ok(instCache);
+      core.startGroup('Saving environment...');
+      await packageCache.clear();
+      await instCache.save();
+      core.endGroup();
+    }
   }
   catch (error) {
     core.setFailed(error.message);
