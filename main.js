@@ -85,7 +85,7 @@ class PackageCache {
     this.jobCacheKey = this.fallbackCacheKey + '-conf:' + shasum.digest('hex').slice(0, 8);
 
     this.restoreKey = undefined;
-    this.pkgCachePath = path.join(msysRootDir, 'var', 'cache', 'pacman', 'pkg');
+    this.pkgCachePath = path.resolve(path.join(msysRootDir, 'var', 'cache', 'pacman', 'pkg'));
   }
 
   async restore() {
@@ -126,7 +126,7 @@ class InstallCache {
     let shasum = crypto.createHash('sha1');
     shasum.update(JSON.stringify(input) + checksum);
     this.jobCacheKey = 'msys2-inst-conf:' + shasum.digest('hex');
-    this.msysRootDir = msysRootDir
+    this.msysRootDir = path.resolve(msysRootDir);
   }
 
   async restore() {
@@ -182,16 +182,14 @@ async function run() {
       return;
     }
 
+    let inputPath = 'C:\\Program Files\\Git\\usr\\bin';
+    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
+
     const tmp_dir = process.env['RUNNER_TEMP'];
     if (!tmp_dir) {
       core.setFailed('environment variable RUNNER_TEMP is undefined');
       return;
     }
-
-    await exec.exec(`tar --version`);
-    let inputPath = 'C:\\Program Files\\Git\\usr\\bin';
-    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
-    await exec.exec(`tar --version`);
 
     const input = parseInput();
 
@@ -206,7 +204,7 @@ async function run() {
 
       instCache = new InstallCache(msysRootDir, input);
       core.startGroup('Restoring environment...');
-      cachedInstall = false;//await instCache.restore();
+      cachedInstall = await instCache.restore();
       core.endGroup();
 
       if (!cachedInstall) {
