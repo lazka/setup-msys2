@@ -86,6 +86,9 @@ class PackageCache {
 
     this.restoreKey = undefined;
     this.pkgCachePath = path.resolve(path.join(msysRootDir, 'var', 'cache', 'pacman', 'pkg'));
+    console.log(`path: ${pkgCachePath}`);
+    console.log(`root: ${msysRootDir}`);
+    console.log(`root: ${path.resolve(msysRootDir)}`);
   }
 
   async restore() {
