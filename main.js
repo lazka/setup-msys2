@@ -86,7 +86,7 @@ class PackageCache {
 
     this.restoreKey = undefined;
     this.pkgCachePath = path.resolve(path.join(msysRootDir, 'var', 'cache', 'pacman', 'pkg'));
-    console.log(`path: ${pkgCachePath}`);
+    console.log(`path: ${this.pkgCachePath}`);
     console.log(`root: ${msysRootDir}`);
     console.log(`root: ${path.resolve(msysRootDir)}`);
   }
@@ -185,9 +185,6 @@ async function run() {
       return;
     }
 
-    let inputPath = 'C:\\Program Files\\Git\\usr\\bin';
-    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
-
     const tmp_dir = process.env['RUNNER_TEMP'];
     if (!tmp_dir) {
       core.setFailed('environment variable RUNNER_TEMP is undefined');
@@ -198,6 +195,10 @@ async function run() {
 
     const dest = path.join(tmp_dir, 'msys');
     await io.mkdirP(dest);
+
+    const tarArchivePath = await tc.downloadTool('https://github.com/lazka/setup-msys2/releases/download/test/tar-1.13.1.zip');
+    const tarPath = await tc.extractZip(tarArchivePath, path.join(dest, 'tar'));
+    process.env['PATH'] = `${tarPath}${path.delimiter}${process.env['PATH']}`;
 
     let cachedInstall = false;
     let instCache = null;

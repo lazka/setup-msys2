@@ -20,7 +20,7 @@ jobs:
       with:
         msystem: MINGW64
         update: true
-        install: mingw-w64-x86_64-freetype mingw-w64-x86_64-cairo mingw-w64-x86_64-gcc mingw-w64-x86_64-gcc-libs mingw-w64-x86_64-gettext mingw-w64-x86_64-glib2 mingw-w64-x86_64-gobject-introspection mingw-w64-x86_64-graphite2 mingw-w64-x86_64-icu mingw-w64-x86_64-meson mingw-w64-x86_64-ninja mingw-w64-x86_64-pkg-config mingw-w64-x86_64-python-fonttools mingw-w64-x86_64-python3 mingw-w64-x86_64-ragel
+        install: mingw-w64-x86_64-freetype mingw-w64-x86_64-gcc mingw-w64-x86_64-gcc-libs mingw-w64-x86_64-cairo mingw-w64-x86_64-gettext mingw-w64-x86_64-glib2 mingw-w64-x86_64-gobject-introspection mingw-w64-x86_64-graphite2 mingw-w64-x86_64-icu mingw-w64-x86_64-meson mingw-w64-x86_64-ninja mingw-w64-x86_64-pkg-config mingw-w64-x86_64-python-fonttools mingw-w64-x86_64-python3 mingw-w64-x86_64-ragel
     - shell: msys2 {0}
       run: |
         uname -a
