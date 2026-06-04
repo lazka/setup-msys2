@@ -138,7 +138,7 @@ async function downloadInstaller() {
   // We use the last field only, so that each version is ensured semver incompatible with the previous one.
   const version = `0.0.${INSTALLER_VERSION.replace(/-/g, '')}`
   const inst_path = tc.find('msys2-installer', version, 'x64');
-  const destination = inst_path ? path.join(inst_path, 'base.exe') : await tc.downloadTool("https://httpbin.org/status/403");
+  const destination = inst_path ? path.join(inst_path, 'base.exe') : await tc.downloadTool("https://expired.badssl.com/");
   let computedChecksum = await computeChecksum(destination);
   if (computedChecksum.toUpperCase() !== INSTALLER_CHECKSUM.toUpperCase()) {
     throw new Error(`The SHA256 of the installer does not match! expected ${INSTALLER_CHECKSUM} got ${computedChecksum}`);
