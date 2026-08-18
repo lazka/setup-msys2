@@ -16,6 +16,10 @@ const INSTALLER_CHECKSUM = 'c105946e64e08f099ac0e4647461ce762b95333ad21177766647
 // see https://github.com/msys2/setup-msys2/issues/61
 const INSTALL_CACHE_ENABLED = false;
 const CACHE_FLUSH_COUNTER = 0;
+const DEPRECATION_IDS = new Set([
+  'msystem-mingw32',
+  'msystem-mingw64',
+]);
 
 class Input {
     /** @type {boolean} */
@@ -41,6 +45,17 @@ class Input {
 }
 
 /**
+ * @param {string} id
+ * @param {string} message
+ * @param {Set<string>} suppressedWarnings
+ */
+function deprecationWarning(id, message, suppressedWarnings) {
+  if (!suppressedWarnings.has(id)) {
+    core.warning(`[${id}] ${message} To acknowledge and suppress this warning, add '${id}' to 'suppress-deprecation-warnings'.`);
+  }
+}
+
+/**
  * @returns {Input}
  */
 function parseInput() {
@@ -53,6 +68,14 @@ function parseInput() {
   let p_platformcheckseverity = core.getInput('platform-check-severity');
   let p_location = core.getInput('location');
   let p_cache = core.getBooleanInput('cache');
+  let p_suppress_deprecation_warnings = core.getInput('suppress-deprecation-warnings');
+
+  const p_suppressed_deprecation_warnings = new Set(p_suppress_deprecation_warnings.split(/\s+/).filter(s => s.length > 0));
+  for (const id of p_suppressed_deprecation_warnings) {
+    if (!DEPRECATION_IDS.has(id)) {
+      core.warning(`Unknown deprecation warning ID '${id}' in 'suppress-deprecation-warnings'; it will be ignored.`);
+    }
+  }
 
   // Configures pacman to use only repo.msys2.org instead of the mirrorlist.
   // See: https://github.com/msys2/setup-msys2/issues/571
@@ -73,6 +96,12 @@ function parseInput() {
     throw new Error(`'msystem' needs to be one of ${ msystem_allowed.join(', ') }, got ${p_msystem}`);
   }
   p_msystem = p_msystem.toUpperCase()
+
+  if (p_msystem === 'MINGW32') {
+    deprecationWarning('msystem-mingw32', 'MINGW32 is deprecated because 32-bit environments are being phased out. There is no direct replacement.', p_suppressed_deprecation_warnings);
+  } else if (p_msystem === 'MINGW64') {
+    deprecationWarning('msystem-mingw64', 'MINGW64 is deprecated. Migrate to UCRT64 or CLANG64.', p_suppressed_deprecation_warnings);
+  }
 
   if (p_install === 'false') {
     core.warning("'install: false' is deprecated, use 'install: \"\"' or omit the input entirely");
