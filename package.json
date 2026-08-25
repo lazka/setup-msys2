@@ -9,8 +9,7 @@
   "type": "module",
   "scripts": {
     "pkg": "rolldown -c",
-    "lint": "eslint .",
-    "tsc": "tsc -p jsconfig.json",
+    "lint": "oxlint .",
     "test": "node --test"
   },
   "keywords": [
@@ -35,11 +34,9 @@
     "@actions/tool-cache": "^4.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
     "@types/node": "^24.13.3",
-    "eslint": "^10.8.1",
-    "eslint-plugin-jsdoc": "^64.2.0",
-    "globals": "^17.11.0",
+    "oxlint": "^1.79.0",
+    "oxlint-tsgolint": "^7.0.2001",
     "rolldown": "^1.2.4",
     "rollup-plugin-sbom": "^4.0.0",
     "typescript": "^7.0.2"

@@ -204,7 +204,7 @@ async function configureMainMirror(msysRootDir) {
 async function saveCacheMaybe(paths, restoreKey, saveKey) {
     if (restoreKey === saveKey) {
         console.log(`Cache unchanged, skipping save for ${saveKey}`);
-        return;
+        return undefined;
     }
 
     let cacheId;
@@ -329,7 +329,7 @@ let cmd = null;
  * @param {string} destDir
  * @param {string} name
  */
-async function writeWrapper(msysRootDir, msystem, pathtype, destDir, name) {
+function writeWrapper(msysRootDir, msystem, pathtype, destDir, name) {
   let wrap = [
     `@echo off`,
     `setlocal`,
@@ -356,10 +356,10 @@ async function runMsys(args, opts) {
 /**
  * @param {string[]} args
  * @param {object} [opts]
- * @param {string} [cmd]
+ * @param {string} [command]
  */
-async function pacman(args, opts, cmd) {
-  await runMsys([cmd ? cmd : 'pacman', '--noconfirm'].concat(args), opts);
+async function pacman(args, opts, command) {
+  await runMsys([command ? command : 'pacman', '--noconfirm'].concat(args), opts);
 }
 
 /**
